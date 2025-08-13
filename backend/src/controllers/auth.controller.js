@@ -42,10 +42,13 @@ export const signup = async (req, res) => {
     } else {
       res.status(400).json({ message: "Invalid user data" });
     }
-  } catch (error) {
-    console.log("Error in signup controller", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
+} catch (error) {
+  console.error("Error in signup controller:", error); // שים לב ל־error המלא
+  if (process.env.NODE_ENV !== "production") {
+    return res.status(500).json({ message: error.message });
   }
+  return res.status(500).json({ message: "Internal Server Error" });
+}
 };
 
 export const login = async (req, res) => {
