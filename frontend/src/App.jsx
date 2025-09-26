@@ -8,10 +8,12 @@ import SignUpPage from './pages/SignUpPage'
 import LoginPage from './pages/LoginPage'
 import SettingsPage from './pages/SettingsPage'   // ← שם תואם לקובץ
 import ProfilePage from './pages/ProfilePage'     // ← שם תואם לקובץ
-
+import useAuthStore from './store/authStore'
 
 
 const App = () => {
+  const {authuser} = useAuthStore()
+
   return (
     <div>
       <Navbar />
