@@ -3,7 +3,7 @@ import { axiosInstance } from "../lib/axios.js";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
 
-const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:5001" : "/";
+const BASE_URL = import.meta.env.DEV ? "http://localhost:5001" : "/";
 
 export const useAuthStore = create((set, get) => ({
   authUser: null,
@@ -17,7 +17,6 @@ export const useAuthStore = create((set, get) => ({
   checkAuth: async () => {
     try {
       const res = await axiosInstance.get("/auth/check");
-
       set({ authUser: res.data });
       get().connectSocket();
     } catch (error) {
@@ -28,44 +27,34 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-signup: async (payload) => {
+  signup: async (payload) => {
     set({ isSigningUp: true });
     try {
       const { data } = await axiosInstance.post("/auth/signup", payload);
-      set({ user: data.user });                 // או מה שה־API מחזיר
+      set({ authUser: data.user }); // ← עקבי
       toast.success(data.message || "Signed up successfully");
       return data;
     } catch (err) {
-      // ✅ אל תקרא ישירות ל-error.response.data ללא בדיקה
       const message =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Signup failed. Please try again.";
+        err?.response?.data?.message || err?.message || "Signup failed";
       console.error("Signup error:", err);
       toast.error(message);
-      // החזר/זרוק כדי שהקומפוננטה תדע שנכשל
       return Promise.reject(err);
     } finally {
       set({ isSigningUp: false });
     }
   },
 
-
-  
-
-
   login: async (payload) => {
     set({ isLoggingIn: true });
     try {
       const { data } = await axiosInstance.post("/auth/login", payload);
-      set({ user: data.user });
+      set({ authUser: data.user }); // ← עקבי
       toast.success(data.message || "Welcome back!");
       return data;
     } catch (err) {
       const message =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Login failed. Please try again.";
+        err?.response?.data?.message || err?.message || "Login failed";
       console.error("Login error:", err);
       toast.error(message);
       return Promise.reject(err);
@@ -82,30 +71,31 @@ signup: async (payload) => {
       toast.success("Profile updated successfully");
     } catch (error) {
       console.log("error in update profile:", error);
-      toast.error(error.response.data.message);
+      toast.error(error?.response?.data?.message || "Update failed");
     } finally {
       set({ isUpdatingProfile: false });
     }
   },
 
   connectSocket: () => {
-    const { authUser } = get();
-    if (!authUser || get().socket?.connected) return;
+    const { authUser, socket } = get();
+    if (!authUser || socket?.connected) return;
 
-    const socket = io(BASE_URL, {
-      query: {
-        userId: authUser._id,
-      },
+    const s = io(BASE_URL, {
+      query: { userId: authUser._id },
+      withCredentials: true,
     });
-    socket.connect();
+    s.connect();
 
-    set({ socket: socket });
+    set({ socket: s });
 
-    socket.on("getOnlineUsers", (userIds) => {
+    s.on("getOnlineUsers", (userIds) => {
       set({ onlineUsers: userIds });
     });
   },
+
   disconnectSocket: () => {
-    if (get().socket?.connected) get().socket.disconnect();
+    const { socket } = get();
+    if (socket?.connected) socket.disconnect();
   },
 }));
