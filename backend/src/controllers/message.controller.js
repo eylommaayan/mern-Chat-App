@@ -35,36 +35,55 @@ export const getMessages = async (req, res) => {
   }
 };
 
+
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image } = req.body;
     const { id: receiverId } = req.params;
-    const senderId = req.user._id;
+    const { text = "", image } = req.body;
 
-    let imageUrl;
-    if (image) {
-      // Upload base64 image to cloudinary
-      const uploadResponse = await cloudinary.uploader.upload(image);
-      imageUrl = uploadResponse.secure_url;
+    if (!text.trim() && !image) {
+      return res.status(400).json({ message: "Text or image is required" });
     }
 
-    const newMessage = new Message({
-      senderId,
+    let imageUrl = "";
+    if (image) {
+      const isDataUrl = /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(image);
+      if (!isDataUrl) {
+        return res.status(400).json({ message: "Invalid image data" });
+      }
+
+      // ניסיון העלאה – לוג מפורט בשגיאה
+      try {
+        const uploaded = await cloudinary.uploader.upload(image, {
+          folder: "chatty/messages",
+          resource_type: "image",
+          transformation: [{ width: 1600, height: 1600, crop: "limit" }],
+        });
+        imageUrl = uploaded.secure_url;
+      } catch (e) {
+        console.error("Cloudinary upload error:", e);
+        const msg =
+          e?.message ||
+          e?.error?.message ||
+          e?.error?.http_code?.toString?.() ||
+          "Image upload failed";
+        return res.status(502).json({ message: msg }); // ← 502 ולא 500 כדי שתדע שזה מהענן
+      }
+    }
+
+    const newMessage = await Message.create({
+      senderId: req.user._id,
       receiverId,
-      text,
+      text: text?.trim() || "",
       image: imageUrl,
     });
 
-    await newMessage.save();
-
     const receiverSocketId = getReceiverSocketId(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("newMessage", newMessage);
-    }
+    if (receiverSocketId) io.to(receiverSocketId).emit("newMessage", newMessage);
 
-    res.status(201).json(newMessage);
-  } catch (error) {
-    console.log("Error in sendMessage controller: ", error.message);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(201).json(newMessage);
+  } catch (err) {
+    console.error("sendMessage controller error:", err);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
-};
+}

@@ -98,4 +98,20 @@ export const useAuthStore = create((set, get) => ({
     const { socket } = get();
     if (socket?.connected) socket.disconnect();
   },
+
+  logout: async () => {
+    try {
+      await axiosInstance.post("/auth/logout"); // בקשת POST עם credentials
+    } catch (e) {
+      console.error("logout failed", e);
+      // גם אם השרת נכשל – ננקה לקוח כדי לא להיתקע
+    } finally {
+      // נקה סטייט לוקאלי
+      set({ authUser: null });
+      // אם אתה שומר ב-localStorage
+      localStorage.removeItem("chat-user");
+      // רענון/ניווט
+      window.location.href = "/login"; // או useNavigate("/login")
+    }
+  },
 }));

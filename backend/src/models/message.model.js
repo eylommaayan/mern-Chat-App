@@ -1,27 +1,26 @@
 import mongoose from "mongoose";
+const { Schema } = mongoose;
 
-const messageSchema = new mongoose.Schema(
+const messageSchema = new Schema(
   {
-    senderId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    receiverId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    text: {
-      type: String,
-    },
-    image: {
-      type: String,
-    },
+    senderId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    receiverId:{ type: Schema.Types.ObjectId, ref: "User", required: true },
+
+    // טקסט לא חובה
+    text: { type: String, default: "" },
+
+    // תמונה (URL אחרי upload) לא חובה
+    image: { type: String, default: "" },
   },
   { timestamps: true }
 );
 
-const Message = mongoose.model("Message", messageSchema);
+// ולידציה: חייבים לפחות אחד – טקסט או תמונה
+messageSchema.pre("validate", function (next) {
+  if (!this.text && !this.image) {
+    return next(new Error("Message must include text or image"));
+  }
+  next();
+});
 
-export default Message;
+export default mongoose.model("Message", messageSchema);
