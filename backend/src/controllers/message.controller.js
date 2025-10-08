@@ -1,18 +1,19 @@
+// backend/src/controllers/message.controller.js
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
-
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
+
+const USE_LOCAL = process.env.USE_LOCAL_DATA_URL === "1";
 
 export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
     const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
-
-    res.status(200).json(filteredUsers);
+    return res.status(200).json(filteredUsers);
   } catch (error) {
-    console.error("Error in getUsersForSidebar: ", error.message);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Error in getUsersForSidebar:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
@@ -28,13 +29,12 @@ export const getMessages = async (req, res) => {
       ],
     });
 
-    res.status(200).json(messages);
+    return res.status(200).json(messages);
   } catch (error) {
-    console.log("Error in getMessages controller: ", error.message);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Error in getMessages controller:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
-
 
 export const sendMessage = async (req, res) => {
   try {
@@ -46,35 +46,36 @@ export const sendMessage = async (req, res) => {
     }
 
     let imageUrl = "";
+
     if (image) {
       const isDataUrl = /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(image);
       if (!isDataUrl) {
         return res.status(400).json({ message: "Invalid image data" });
       }
 
-      // ניסיון העלאה – לוג מפורט בשגיאה
-      try {
-        const uploaded = await cloudinary.uploader.upload(image, {
-          folder: "chatty/messages",
-          resource_type: "image",
-          transformation: [{ width: 1600, height: 1600, crop: "limit" }],
-        });
-        imageUrl = uploaded.secure_url;
-      } catch (e) {
-        console.error("Cloudinary upload error:", e);
-        const msg =
-          e?.message ||
-          e?.error?.message ||
-          e?.error?.http_code?.toString?.() ||
-          "Image upload failed";
-        return res.status(502).json({ message: msg }); // ← 502 ולא 500 כדי שתדע שזה מהענן
+      if (USE_LOCAL) {
+        // מצב פיתוח: שמירת ה־Base64 ישירות
+        imageUrl = image;
+      } else {
+        try {
+          const uploaded = await cloudinary.uploader.upload(image, {
+            folder: "chatty/messages",
+            resource_type: "image",
+            transformation: [{ width: 1600, height: 1600, crop: "limit" }],
+          });
+          imageUrl = uploaded.secure_url;
+        } catch (e) {
+          console.error("Cloudinary upload error:", e);
+          const msg = e?.message || e?.error?.message || "Image upload failed";
+          return res.status(502).json({ message: msg });
+        } 
       }
     }
 
     const newMessage = await Message.create({
       senderId: req.user._id,
       receiverId,
-      text: text?.trim() || "",
+      text: text.trim(),
       image: imageUrl,
     });
 
@@ -86,4 +87,4 @@ export const sendMessage = async (req, res) => {
     console.error("sendMessage controller error:", err);
     return res.status(500).json({ message: "Internal Server Error" });
   }
-}
+};
