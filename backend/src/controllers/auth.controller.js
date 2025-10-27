@@ -6,73 +6,84 @@ import cloudinary from "../lib/cloudinary.js";
 export const signup = async (req, res) => {
   const { fullName, email, password } = req.body;
   try {
-    if (!fullName || !email || !password)
+    if (!fullName || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
-    if (password.length < 6)
+    }
+
+    if (password.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
 
-    const emailLower = email.toLowerCase();
-    const exists = await User.findOne({ email: emailLower });
-    if (exists) return res.status(400).json({ message: "Email already exists" });
+    const user = await User.findOne({ email });
 
-    // ✅ בלי הצפנה ידנית – ה-pre('save') ידאג לזה
-    const newUser = new User({ fullName, email: emailLower, password });
+    if (user) return res.status(400).json({ message: "Email already exists" });
 
-    await newUser.save();                // קודם נשמור...
-    generateToken(newUser._id, res);     // ...ואז ניצור JWT
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    res.status(201).json({
-      _id: newUser._id,
-      fullName: newUser.fullName,
-      email: newUser.email,
-      profilePic: newUser.profilePic,
+    const newUser = new User({
+      fullName,
+      email,
+      password: hashedPassword,
     });
-  } catch (err) {
-    console.log("Error in signup controller", err.message);
+
+    if (newUser) {
+      // generate jwt token here
+      generateToken(newUser._id, res);
+      await newUser.save();
+
+      res.status(201).json({
+        _id: newUser._id,
+        fullName: newUser.fullName,
+        email: newUser.email,
+        profilePic: newUser.profilePic,
+      });
+    } else {
+      res.status(400).json({ message: "Invalid user data" });
+    }
+  } catch (error) {
+    console.log("Error in signup controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
-
 export const login = async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    const user = await User.findOne({ email });
 
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok) return res.status(400).json({ message: "Invalid credentials" });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
 
     generateToken(user._id, res);
+
     res.status(200).json({
       _id: user._id,
       fullName: user.fullName,
       email: user.email,
       profilePic: user.profilePic,
     });
-  } catch (err) {
-    console.log("Error in login controller", err.message);
+  } catch (error) {
+    console.log("Error in login controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
-
-// controllers/auth.controller.js
 export const logout = (req, res) => {
   try {
-    res.clearCookie("jwt", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // ב־https בלבד בפרודקשן
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      path: "/",
-    });
-    return res.status(200).json({ message: "Logged out successfully" });
+    res.cookie("jwt", "", { maxAge: 0 });
+    res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
     console.log("Error in logout controller", error.message);
-    return res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
-
 
 export const updateProfile = async (req, res) => {
   try {

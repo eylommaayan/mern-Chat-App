@@ -1,19 +1,18 @@
-// backend/src/controllers/message.controller.js
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
+
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
-
-const USE_LOCAL = process.env.USE_LOCAL_DATA_URL === "1";
 
 export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
     const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
-    return res.status(200).json(filteredUsers);
+
+    res.status(200).json(filteredUsers);
   } catch (error) {
-    console.error("Error in getUsersForSidebar:", error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    console.error("Error in getUsersForSidebar: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -29,62 +28,43 @@ export const getMessages = async (req, res) => {
       ],
     });
 
-    return res.status(200).json(messages);
+    res.status(200).json(messages);
   } catch (error) {
-    console.error("Error in getMessages controller:", error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    console.log("Error in getMessages controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
 export const sendMessage = async (req, res) => {
   try {
+    const { text, image } = req.body;
     const { id: receiverId } = req.params;
-    const { text = "", image } = req.body;
+    const senderId = req.user._id;
 
-    if (!text.trim() && !image) {
-      return res.status(400).json({ message: "Text or image is required" });
-    }
-
-    let imageUrl = "";
-
+    let imageUrl;
     if (image) {
-      const isDataUrl = /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(image);
-      if (!isDataUrl) {
-        return res.status(400).json({ message: "Invalid image data" });
-      }
-
-      if (USE_LOCAL) {
-        // מצב פיתוח: שמירת ה־Base64 ישירות
-        imageUrl = image;
-      } else {
-        try {
-          const uploaded = await cloudinary.uploader.upload(image, {
-            folder: "chatty/messages",
-            resource_type: "image",
-            transformation: [{ width: 1600, height: 1600, crop: "limit" }],
-          });
-          imageUrl = uploaded.secure_url;
-        } catch (e) {
-          console.error("Cloudinary upload error:", e);
-          const msg = e?.message || e?.error?.message || "Image upload failed";
-          return res.status(502).json({ message: msg });
-        } 
-      }
+      // Upload base64 image to cloudinary
+      const uploadResponse = await cloudinary.uploader.upload(image);
+      imageUrl = uploadResponse.secure_url;
     }
 
-    const newMessage = await Message.create({
-      senderId: req.user._id,
+    const newMessage = new Message({
+      senderId,
       receiverId,
-      text: text.trim(),
+      text,
       image: imageUrl,
     });
 
-    const receiverSocketId = getReceiverSocketId(receiverId);
-    if (receiverSocketId) io.to(receiverSocketId).emit("newMessage", newMessage);
+    await newMessage.save();
 
-    return res.status(201).json(newMessage);
-  } catch (err) {
-    console.error("sendMessage controller error:", err);
-    return res.status(500).json({ message: "Internal Server Error" });
+    const receiverSocketId = getReceiverSocketId(receiverId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("newMessage", newMessage);
+    }
+
+    res.status(201).json(newMessage);
+  } catch (error) {
+    console.log("Error in sendMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
