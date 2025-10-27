@@ -31,17 +31,23 @@ app.use(
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 
+
 // Static + SPA fallback
 if (process.env.NODE_ENV === "production") {
-  const distPath = path.join(__dirname, "../frontend/dist");
+  // ../src → .. (backend) → .. (root) → frontend/dist
+  const rootDir  = path.resolve(__dirname, "..", "..");
+  const distPath = path.join(rootDir, "frontend", "dist");
+
   app.use(express.static(distPath));
 
-  // ⬅️ Fallback ללא דפוס נתיב (עוקף את path-to-regexp)
+  // fallback לכל מה שלא /api/**
   app.use((req, res, next) => {
     if (req.path.startsWith("/api/")) return next();
     res.sendFile(path.join(distPath, "index.html"));
   });
 }
+
+
 
 server.listen(PORT, () => {
   console.log("server is running on PORT:" + PORT);
