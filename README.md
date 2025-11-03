@@ -47,53 +47,9 @@
 
 ```
 
-MERN-CHAT-APP/
-│
-├── backend/
-│   ├── src/
-│   │   ├── controllers/      ← ניהול אימות והודעות
-│   │   ├── lib/              ← Cloudinary, Socket.io, DB
-│   │   ├── middleware/       ← אימות ראוטים עם JWT
-│   │   ├── models/           ← סכימות משתמשים והודעות
-│   │   ├── routes/           ← REST API ל־auth/messages
-│   │   └── index.js          ← שרת Express הראשי
-│
-├── frontend/
-│   ├── src/
-│   │   ├── components/       ← רכיבי UI לצ’אט, סיידבר, נבבר
-│   │   ├── pages/            ← דפי Login, Signup, Profile
-│   │   ├── store/            ← Zustand state management
-│   │   └── App.jsx           ← ניהול ראוטינג ומצב משתמש
-│
-└── README.md
 
-````
 
----
-
-## 👤 דוגמה מתוך הקוד
-
-### ProfilePage.jsx
-```jsx
-const handleImageUpload = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.readAsDataURL(file);
-
-  reader.onload = async () => {
-    const base64Image = reader.result;
-    setSelectedImg(base64Image);
-    await updateProfile({ profilePic: base64Image });
-  };
-};
-````
-
-📸 המשתמש מעלה תמונה, הקובץ מומר ל־Base64 ונשלח לשרת לעדכון ב־Cloudinary.
-
----
-
+📸 המשתמש מעלה תמונה, הקובץ מומר ל־Base64 ונשלח לשרת לעדכון ב־Cloudinary
 ## 🚀 הפעלה מקומית
 
 ```bash
