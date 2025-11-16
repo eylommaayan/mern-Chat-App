@@ -15,7 +15,7 @@
 ```markdown
 # 💬 MERN ICQ Chat App
 
-פרויקט צ'אט בזמן אמת המבוסס על **MERN Stack** (MongoDB, Express, React, Node.js).  
+פרויקט צ'אט בזמן אמת המבוסס על MERN Stack** (MongoDB, Express, React, Node.js).  
 האפליקציה התכתבות – עם מערכת משתמשים, העלאת תמונת פרופיל, התחברות, צ'אט בזמן אמת, ו־Theme משתנה.
 
 ---
